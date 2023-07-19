@@ -115,7 +115,7 @@ fn ncmdump(input: &path::Path, output_dir: &path::Path) {
             .map_err(|_| CliError::WriteError(output_dir.clone()));
         let mut write = write;
 
-        dump.write_with_tag_to_file(&mut write).map_err(|_| CliError::WriteError(output_dir))
+        dump.write_with_tag(&mut write).map_err(|_| CliError::WriteError(output_dir))
     };
 
     if let Err(e) = res {

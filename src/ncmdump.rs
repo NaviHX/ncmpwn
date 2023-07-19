@@ -2,13 +2,17 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use serde::Deserialize;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::fs::File;
 
 pub mod error;
 use error::{DumpResult, Error};
 
 #[cfg(feature = "tag")]
-use audiotags::{AudioTag, FlacTag, Id3v2Tag, Picture};
+mod tag;
+#[cfg(feature = "tag")]
+use tag::TagWrite;
+
+#[cfg(feature = "tag")]
+use audiotags::{AudioTagEdit, FlacTag, Id3v2Tag, Picture};
 
 #[cfg(feature = "tag")]
 use id3::Tag as ID3v2InnerTag;
@@ -19,12 +23,29 @@ use metaflac::Tag as FlacInnerTag;
 #[cfg(feature = "tag")]
 use image;
 
+#[deprecated]
+#[allow(unused_macros)]
 macro_rules! build_tag {
     ($tag:ident, $inner_tag:ident, $reader:ident) => {{
         let inner_tag = $inner_tag::read_from($reader)?;
         let tag: $tag = inner_tag.into();
 
         Ok(Box::new(tag) as Box<dyn AudioTag>)
+    }};
+}
+
+macro_rules! write_tag {
+    ($tag:ty, $inner_tag:ty, $reader:ident, $writer:ident, $info:ident, $cover:ident) => {{
+        let inner_tag = <$inner_tag>::read_from($reader)?;
+        let mut tag: $tag = inner_tag.into();
+        tag.set_title(&($info).name);
+        tag.set_artist(&construct_artist_list(&($info).artist));
+        tag.set_album_title(&($info).album);
+        tag.set_album_cover($cover);
+        let mut inner_tag: $inner_tag = tag.into();
+        inner_tag.write_with_tag_to($writer)?;
+
+        Ok(())
     }};
 }
 
@@ -182,7 +203,7 @@ impl<R: Read + Seek> NcmDump<R> {
     }
 
     #[cfg(feature = "tag")]
-    pub fn write_with_tag_to_file(&mut self, writer: &mut File) -> DumpResult<()> {
+    pub fn write_with_tag(&mut self, writer: &mut impl Write) -> DumpResult<()> {
         let info = self.get_info()?;
         let image = self.get_image()?;
         let image_format = image::guess_format(&image).map_err(|_| Error::ImageFormatError)?;
@@ -191,18 +212,12 @@ impl<R: Read + Seek> NcmDump<R> {
         self.move_to_start()?;
 
         let media_format: MediaFormat = info.format.as_str().into();
-        let mut tag_writer: Box<dyn AudioTag> = match media_format {
-            MediaFormat::fLaC => build_tag!(FlacTag, FlacInnerTag, self),
-            MediaFormat::ID3v2 => build_tag!(Id3v2Tag, ID3v2InnerTag, self),
+        match media_format {
+            MediaFormat::ID3v2 => write_tag!(Id3v2Tag, ID3v2InnerTag, self, writer, info, cover),
+            MediaFormat::fLaC => write_tag!(FlacTag, FlacInnerTag, self, writer, info, cover),
             MediaFormat::Unsupported => Err(Error::TagBuildError("Unsupported format".to_string())),
         }?;
 
-        tag_writer.set_title(&info.name);
-        tag_writer.set_artist(&construct_artist_list(&info.artist));
-        tag_writer.set_album_title(&info.album);
-        tag_writer.set_album_cover(cover);
-
-        tag_writer.write_to(writer)?;
         Ok(())
     }
 }
@@ -301,6 +316,18 @@ impl<R: Read + Seek> Seek for NcmDump<R> {
 
         self.cursor = (new_pos - self.data_start) as usize;
         Ok(self.cursor as u64)
+    }
+}
+
+
+fn image_to_audiotag_mimetype(image_mime: image::ImageFormat) -> DumpResult<audiotags::MimeType> {
+    match image_mime {
+        image::ImageFormat::Png => Ok(audiotags::MimeType::Png),
+        image::ImageFormat::Jpeg => Ok(audiotags::MimeType::Jpeg),
+        image::ImageFormat::Gif => Ok(audiotags::MimeType::Gif),
+        image::ImageFormat::Tiff => Ok(audiotags::MimeType::Tiff),
+        image::ImageFormat::Bmp => Ok(audiotags::MimeType::Bmp),
+        _ => Err(Error::ImageUnsupportedError),
     }
 }
 
@@ -487,16 +514,5 @@ mod test {
                 0xff, 0xd9,
             ],
         );
-    }
-}
-
-fn image_to_audiotag_mimetype(image_mime: image::ImageFormat) -> DumpResult<audiotags::MimeType> {
-    match image_mime {
-        image::ImageFormat::Png => Ok(audiotags::MimeType::Png),
-        image::ImageFormat::Jpeg => Ok(audiotags::MimeType::Jpeg),
-        image::ImageFormat::Gif => Ok(audiotags::MimeType::Gif),
-        image::ImageFormat::Tiff => Ok(audiotags::MimeType::Tiff),
-        image::ImageFormat::Bmp => Ok(audiotags::MimeType::Bmp),
-        _ => Err(Error::ImageUnsupportedError),
     }
 }
