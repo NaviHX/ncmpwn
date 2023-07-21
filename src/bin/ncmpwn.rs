@@ -2,15 +2,17 @@ use clap::Parser;
 use do_notation::m;
 use ncmpwn::{ncmdump::NcmDump, qmcdump::QmcDump};
 use thiserror::Error;
+#[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
+#[cfg(feature = "log")]
 extern crate pretty_env_logger;
+use std::env;
 use std::io;
 use std::iter::Iterator;
 use std::path;
 use std::sync::mpsc;
 use std::thread;
-use std::env;
 
 #[derive(Debug, Parser)]
 struct CliArgs {
@@ -24,7 +26,7 @@ struct CliArgs {
     pub worker: u8,
 
     /// Add tag for ncm files
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long, default_value_t = false)]
     pub tag: bool,
 
     /// Output dir (default: PWD)
@@ -58,7 +60,10 @@ fn main() {
 
     let mut txs = vec![];
     let mut handles = vec![];
-    let output_dir = args.output.unwrap_or_else(|| env::current_dir().expect("Cannot get PWD"));
+    let output_dir = args
+        .output
+        .unwrap_or_else(|| env::current_dir().expect("Cannot get PWD"));
+    let tag = args.tag;
     for _ in 0..args.worker {
         let (tx, rx) = mpsc::channel();
         txs.push(tx);
@@ -70,7 +75,7 @@ fn main() {
                     break;
                 }
                 Job::Ncm(fp) => {
-                    ncmdump(&fp, &output_dir);
+                    ncmdump(&fp, &output_dir, tag);
                 }
                 Job::Qmc(fp) => {
                     qmcdump(&fp, &output_dir);
@@ -92,7 +97,7 @@ fn main() {
     }
 }
 
-fn ncmdump(input: &path::Path, output_dir: &path::Path) {
+fn ncmdump(input: &path::Path, output_dir: &path::Path, add_tag: bool) {
     let res: Result<(), CliError> = m! {
         basename <- input.file_stem().ok_or(CliError::BaseNameError).map(|s| s.to_owned());
         basename <- basename.to_str().ok_or(CliError::BaseNameError);
@@ -103,7 +108,7 @@ fn ncmdump(input: &path::Path, output_dir: &path::Path) {
         ext <- match ncmpwn::ncmdump::MediaFormat::from(info.format.as_str()) {
             ncmpwn::ncmdump::MediaFormat::fLaC => Ok("flac"),
             ncmpwn::ncmdump::MediaFormat::ID3v2 => Ok("mp3"),
-            ncmpwn::ncmdump::MediaFormat::Unsupported => Err(CliError::UnsupportedFormat),
+            _ => Err(CliError::UnsupportedFormat),
         };
         let output_file = format!("{basename}.{ext}");
         let mut output_dir = output_dir.to_owned();
@@ -115,7 +120,11 @@ fn ncmdump(input: &path::Path, output_dir: &path::Path) {
             .map_err(|_| CliError::WriteError(output_dir.clone()));
         let mut write = write;
 
-        dump.write_with_tag(&mut write).map_err(|_| CliError::WriteError(output_dir))
+        if add_tag {
+            dump.write_with_tag(&mut write).map_err(|_| CliError::WriteError(output_dir))
+        } else {
+            dump.write_to(&mut write).map_err(|_| CliError::WriteError(output_dir))
+        }
     };
 
     if let Err(e) = res {

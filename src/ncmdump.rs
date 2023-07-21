@@ -79,11 +79,13 @@ pub struct NcmInfo {
 }
 
 #[allow(non_camel_case_types)]
+#[derive(Clone, Copy)]
 pub enum MediaFormat {
     fLaC,
     ID3v2,
 
     Unsupported,
+    Unknown,
 }
 
 impl From<&str> for MediaFormat {
@@ -142,9 +144,7 @@ impl<R: Read + Seek> NcmDump<R> {
         }
         let image_length = u32::from_ne_bytes(image_length_buf);
         let image_start = reader.stream_position()?;
-        let image_end = image_start + image_length as u64;
-        let data_start = image_end;
-        reader.seek(SeekFrom::Current(image_length as i64))?;
+        let data_start = reader.seek(SeekFrom::Current(image_length as i64))?;
 
         Ok(Self {
             reader,
@@ -193,6 +193,7 @@ impl<R: Read + Seek> NcmDump<R> {
 
     pub fn move_to_start(&mut self) -> std::io::Result<()> {
         self.reader.seek(SeekFrom::Start(self.data_start))?;
+        self.cursor = 0;
         Ok(())
     }
 
@@ -203,7 +204,7 @@ impl<R: Read + Seek> NcmDump<R> {
     }
 
     #[cfg(feature = "tag")]
-    pub fn write_with_tag(&mut self, writer: &mut impl Write) -> DumpResult<()> {
+    pub fn write_with_tag(&mut self, writer: &mut (impl Write + Seek)) -> DumpResult<()> {
         let info = self.get_info()?;
         let image = self.get_image()?;
         let image_format = image::guess_format(&image).map_err(|_| Error::ImageFormatError)?;
@@ -213,9 +214,21 @@ impl<R: Read + Seek> NcmDump<R> {
 
         let media_format: MediaFormat = info.format.as_str().into();
         match media_format {
-            MediaFormat::ID3v2 => write_tag!(Id3v2Tag, ID3v2InnerTag, self, writer, info, cover),
-            MediaFormat::fLaC => write_tag!(FlacTag, FlacInnerTag, self, writer, info, cover),
-            MediaFormat::Unsupported => Err(Error::TagBuildError("Unsupported format".to_string())),
+            MediaFormat::ID3v2 => {
+                let res: DumpResult<()> = unsafe {
+                    let p = self as *mut Self;
+                    let reader: &mut Self = &mut *p;
+                    write_tag!(Id3v2Tag, ID3v2InnerTag, reader, writer, info, cover)
+                };
+                std::io::copy(self, writer)?;
+                res
+            }
+            MediaFormat::fLaC => {
+                let res: DumpResult<()> = write_tag!(FlacTag, FlacInnerTag, self, writer, info, cover);
+                std::io::copy(self, writer)?;
+                res
+            }
+            _ => Err(Error::TagBuildError("Unsupported format".to_string())),
         }?;
 
         Ok(())
@@ -319,7 +332,6 @@ impl<R: Read + Seek> Seek for NcmDump<R> {
     }
 }
 
-
 fn image_to_audiotag_mimetype(image_mime: image::ImageFormat) -> DumpResult<audiotags::MimeType> {
     match image_mime {
         image::ImageFormat::Png => Ok(audiotags::MimeType::Png),
@@ -333,7 +345,10 @@ fn image_to_audiotag_mimetype(image_mime: image::ImageFormat) -> DumpResult<audi
 
 #[cfg(test)]
 mod test {
-    use std::{fs::File, io::Read};
+    use std::{
+        fs::File,
+        io::Read,
+    };
 
     use crate::ncmdump::{build_key_box, decrypt_meta};
 
@@ -514,5 +529,24 @@ mod test {
                 0xff, 0xd9,
             ],
         );
+    }
+
+    #[test]
+    fn test_write_with_tag() {
+        let mut dump = NcmDump::from_reader(File::open("./tests/test.ncm").unwrap()).unwrap();
+        let mut writer = File::options()
+            .create(true)
+            .write(true)
+            .open("./tests/test.flac")
+            .unwrap();
+        dump.write_to(&mut writer).unwrap();
+
+        let mut dump = NcmDump::from_reader(File::open("./tests/sample.ncm").unwrap()).unwrap();
+        let mut writer = File::options()
+            .create(true)
+            .write(true)
+            .open("./tests/sample.flac")
+            .unwrap();
+        dump.write_with_tag(&mut writer).unwrap();
     }
 }

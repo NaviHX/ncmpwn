@@ -1,4 +1,5 @@
 use std::io::{Read, Seek};
+use crate::MediaFormat;
 
 const KEY: [u8; 256] = [
     0x77, 0x48, 0x32, 0x73, 0xDE, 0xF2, 0xC0, 0xC8, 0x95, 0xEC, 0x30, 0xB2, 0x51, 0xC3, 0xE1, 0xA0,
@@ -33,6 +34,7 @@ fn get_mask(offset: usize, keybox: &[u8]) -> u8 {
 pub struct QmcDump<R: Read> {
     reader: R,
     cursor: usize,
+    format: MediaFormat,
 }
 
 impl<R: Read> QmcDump<R> {
@@ -40,6 +42,15 @@ impl<R: Read> QmcDump<R> {
         Self {
             reader,
             cursor: 0usize,
+            format: MediaFormat::Unknown,
+        }
+    }
+
+    pub fn from_reader_with_format(reader: R, format: MediaFormat) -> Self {
+        Self {
+            reader,
+            cursor: 0usize,
+            format,
         }
     }
 }
@@ -61,6 +72,16 @@ impl<R: Read + Seek> Seek for QmcDump<R> {
         let p = self.reader.seek(pos)?;
         self.cursor = p as usize;
         Ok(p)
+    }
+}
+
+impl<R: Read + Seek> QmcDump<R> {
+    pub fn set_format(&mut self, format: MediaFormat) {
+        self.format = format;
+    }
+
+    pub fn get_format(&self) -> MediaFormat {
+        self.format
     }
 }
 
@@ -131,7 +152,6 @@ mod test {
 
         dump.seek(SeekFrom::Start(0)).unwrap();
         let mut res: [u8; 4] = [0; 4];
-
 
         let size = dump.read(&mut res).unwrap();
         assert_eq!(size, 4);
