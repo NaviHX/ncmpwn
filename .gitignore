@@ -2,3 +2,5 @@
 /Cargo.lock
 *.mp3
 *.flac
+/ncmpwn-yew/target
+/ncmpwn-yew/dist
