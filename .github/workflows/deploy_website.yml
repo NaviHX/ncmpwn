@@ -38,6 +38,7 @@ jobs:
         run: |
           cd ncmpwn-yew
           trunk build --release
+          cd ..
 
       # - name: Install rust (nightly)
       #   uses: actions-rs/toolchain@v1
