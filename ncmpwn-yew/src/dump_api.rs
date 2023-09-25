@@ -1,4 +1,4 @@
-use std::{path::Path, io::{Cursor, Read, Seek, SeekFrom, self}};
+use std::{path::Path, io::{Cursor, Read}};
 pub use ncmpwn::ncmdump::MediaFormat;
 use ncmpwn::{ncmdump::{NcmInfo, NcmDump}, qmcdump::QmcDump};
 pub use ncmpwn::ncmdump::{ error::DumpResult, error::Error as DumpError };
@@ -33,7 +33,6 @@ pub fn decrypt_qmc(source: &[u8]) -> DumpResult<(MediaFormat, Vec<u8>)> {
     }
 }
 
-// TODO Write with tag
 pub fn decrypt_ncm(source: &[u8]) -> DumpResult<(NcmInfo, Vec<u8>, Vec<u8>)> {
     let reader = Cursor::new(source);
     let mut reader = NcmDump::from_reader(reader)?;
@@ -58,6 +57,7 @@ pub fn media_mime_to_ext(format: MediaFormat) -> &'static str {
     }
 }
 
+#[allow(unused)]
 pub fn img_to_element(format: ImageFormat, data: &str) -> String {
     match format {
         ImageFormat::Png => format!("data:image/png;base64,{}", data),
@@ -75,7 +75,7 @@ pub fn img_to_element(format: ImageFormat, data: &str) -> String {
         ImageFormat::Farbfeld => format!("data:image/farbeld;base64,{}", data),
         ImageFormat::Avif => format!("data:image/avif;base64,{}", data),
         ImageFormat::Qoi => format!("data:image/qoi;base64,{}", data),
-        _ => format!("{}", data),
+        _ => data.to_string(),
     }
 }
 

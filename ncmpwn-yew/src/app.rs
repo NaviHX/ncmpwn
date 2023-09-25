@@ -1,12 +1,10 @@
 use std::collections::HashMap;
-use std::io::Cursor;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use do_notation::m;
 use gloo_file::callbacks::FileReader;
 use gloo_file::File;
-use image::io::Reader as ImageReader;
 use image::ImageFormat;
 use ncmpwn::error::{DumpResult, Error as DumpError};
 use ncmpwn::MediaFormat;
@@ -19,7 +17,7 @@ use material_yew::top_app_bar_fixed::MatTopAppBarTitle;
 use material_yew::MatCircularProgress;
 use material_yew::MatTopAppBarFixed;
 
-use crate::dump_api::{self, img_to_element, media_mime_to_ext, data_to_element};
+use crate::dump_api::{self, media_mime_to_ext, data_to_element};
 
 // const WIDTH: u32 = 128;
 // const HEIGHT: u32 = 128;
@@ -32,10 +30,11 @@ pub struct App {
 
 enum DecryptTask {
     Decrypting(String),
-    Finished(DecryptedFile),
+    Finished(Box<DecryptedFile>),
     Error(String, String),
 }
 
+#[allow(unused)]
 pub struct DecryptedFile {
     original_name: String,
     name: String,
@@ -46,7 +45,7 @@ pub struct DecryptedFile {
 
 pub enum Msg {
     Add(Vec<File>),
-    Finish(Uuid, DecryptedFile),
+    Finish(Uuid, Box<DecryptedFile>),
     Error(Uuid, String),
 }
 
@@ -114,13 +113,13 @@ impl Component for App {
                                                 let orig = filename.clone();
                                                 let mut filename = info.name.clone();
                                                 filename.push_str(media_mime_to_ext(format));
-                                                link.send_message(Msg::Finish(uuid, DecryptedFile {
+                                                link.send_message(Msg::Finish(uuid, Box::new(DecryptedFile {
                                                     original_name: orig,
                                                     name: filename,
                                                     image: Some((image_format, image)),
                                                     data: (format, data),
                                                     info: Some(info),
-                                                }))
+                                                })))
                                             }
                                             Err(e) => {
                                                 link.send_message(Msg::Error(uuid, e.to_string()));
@@ -150,13 +149,13 @@ impl Component for App {
                                                 let orig = filename.clone();
                                                 let mut filename = filename;
                                                 filename.push_str(media_mime_to_ext(format));
-                                                link.send_message(Msg::Finish(uuid, DecryptedFile {
+                                                link.send_message(Msg::Finish(uuid, Box::new(DecryptedFile {
                                                     original_name: orig,
                                                     name: filename,
                                                     image: None,
                                                     data: (format, data),
                                                     info: None,
-                                                }))
+                                                })))
                                             }
                                             Err(e) => {
                                                 link.send_message(Msg::Error(uuid, e.to_string()));
