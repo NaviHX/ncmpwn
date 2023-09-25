@@ -1,8 +1,15 @@
-use std::{path::Path, io::{Cursor, Read, Seek, SeekFrom, self}};
-pub use ncmpwn::ncmdump::MediaFormat;
-use ncmpwn::{ncmdump::{NcmInfo, NcmDump}, qmcdump::QmcDump};
-pub use ncmpwn::ncmdump::{ error::DumpResult, error::Error as DumpError };
+use gloo_file::{Blob, ObjectUrl};
 use image::ImageFormat;
+pub use ncmpwn::ncmdump::MediaFormat;
+pub use ncmpwn::ncmdump::{error::DumpResult, error::Error as DumpError};
+use ncmpwn::{
+    ncmdump::{NcmDump, NcmInfo},
+    qmcdump::QmcDump,
+};
+use std::{
+    io::{Cursor, Read},
+    path::Path,
+};
 
 pub fn guess_from_qmc_ext(path: &Path) -> MediaFormat {
     match path.extension() {
@@ -13,8 +20,8 @@ pub fn guess_from_qmc_ext(path: &Path) -> MediaFormat {
                 "qmcflac" => MediaFormat::fLaC,
                 "qmc3" => MediaFormat::ID3v2,
                 _ => MediaFormat::Unsupported,
-            }
-        }
+            },
+        },
     }
 }
 
@@ -33,7 +40,6 @@ pub fn decrypt_qmc(source: &[u8]) -> DumpResult<(MediaFormat, Vec<u8>)> {
     }
 }
 
-// TODO Write with tag
 pub fn decrypt_ncm(source: &[u8]) -> DumpResult<(NcmInfo, Vec<u8>, Vec<u8>)> {
     let reader = Cursor::new(source);
     let mut reader = NcmDump::from_reader(reader)?;
@@ -58,6 +64,7 @@ pub fn media_mime_to_ext(format: MediaFormat) -> &'static str {
     }
 }
 
+#[allow(unused)]
 pub fn img_to_element(format: ImageFormat, data: &str) -> String {
     match format {
         ImageFormat::Png => format!("data:image/png;base64,{}", data),
@@ -75,14 +82,21 @@ pub fn img_to_element(format: ImageFormat, data: &str) -> String {
         ImageFormat::Farbfeld => format!("data:image/farbeld;base64,{}", data),
         ImageFormat::Avif => format!("data:image/avif;base64,{}", data),
         ImageFormat::Qoi => format!("data:image/qoi;base64,{}", data),
-        _ => format!("{}", data),
+        _ => data.to_string(),
     }
 }
 
+#[allow(unused)]
+#[deprecated]
 pub fn data_to_element(format: MediaFormat, data: &str) -> String {
     match format {
         MediaFormat::fLaC => format!("data:audio/flac;base64,{}", data),
         MediaFormat::ID3v2 => format!("data:audio/mp3;base64,{}", data),
         _ => "".to_owned(),
     }
+}
+
+pub fn data_to_object_url(data: &[u8]) -> ObjectUrl {
+    let object = Blob::new(data);
+    ObjectUrl::from(object)
 }
