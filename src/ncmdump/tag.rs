@@ -8,12 +8,14 @@ pub trait TagWrite {
 
 impl TagWrite for ID3v2InnerTag {
     fn write_with_tag_to(&mut self, writer: &mut impl std::io::Write) -> DumpResult<()> {
-        self.write_to(writer, id3::Version::Id3v24).map_err(|e| Error::TagWritedError(e.to_string()))
+        self.write_to(writer, id3::Version::Id3v24)
+            .map_err(|e| Error::TagWritedError(e.to_string()))
     }
 }
 
 impl TagWrite for FlacInnerTag {
     fn write_with_tag_to(&mut self, writer: &mut impl std::io::Write) -> DumpResult<()> {
-        self.write_to(writer).map_err(|e| Error::TagWritedError(e.to_string()))
+        self.write_to(writer)
+            .map_err(|e| Error::TagWritedError(e.to_string()))
     }
 }

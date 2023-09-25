@@ -1,9 +1,15 @@
-use std::{path::Path, io::{Cursor, Read}};
-pub use ncmpwn::ncmdump::MediaFormat;
-use ncmpwn::{ncmdump::{NcmInfo, NcmDump}, qmcdump::QmcDump};
-pub use ncmpwn::ncmdump::{ error::DumpResult, error::Error as DumpError };
-use image::ImageFormat;
 use gloo_file::{Blob, ObjectUrl};
+use image::ImageFormat;
+pub use ncmpwn::ncmdump::MediaFormat;
+pub use ncmpwn::ncmdump::{error::DumpResult, error::Error as DumpError};
+use ncmpwn::{
+    ncmdump::{NcmDump, NcmInfo},
+    qmcdump::QmcDump,
+};
+use std::{
+    io::{Cursor, Read},
+    path::Path,
+};
 
 pub fn guess_from_qmc_ext(path: &Path) -> MediaFormat {
     match path.extension() {
@@ -14,8 +20,8 @@ pub fn guess_from_qmc_ext(path: &Path) -> MediaFormat {
                 "qmcflac" => MediaFormat::fLaC,
                 "qmc3" => MediaFormat::ID3v2,
                 _ => MediaFormat::Unsupported,
-            }
-        }
+            },
+        },
     }
 }
 

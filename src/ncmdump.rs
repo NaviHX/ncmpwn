@@ -224,7 +224,8 @@ impl<R: Read + Seek> NcmDump<R> {
                 res
             }
             MediaFormat::fLaC => {
-                let res: DumpResult<()> = write_tag!(FlacTag, FlacInnerTag, self, writer, info, cover);
+                let res: DumpResult<()> =
+                    write_tag!(FlacTag, FlacInnerTag, self, writer, info, cover);
                 std::io::copy(self, writer)?;
                 res
             }
@@ -345,10 +346,7 @@ fn image_to_audiotag_mimetype(image_mime: image::ImageFormat) -> DumpResult<audi
 
 #[cfg(test)]
 mod test {
-    use std::{
-        fs::File,
-        io::Read,
-    };
+    use std::{fs::File, io::Read};
 
     use crate::ncmdump::{build_key_box, decrypt_meta};
 

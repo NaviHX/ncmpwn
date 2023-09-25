@@ -8,16 +8,16 @@ use gloo_file::{File, ObjectUrl};
 use image::ImageFormat;
 use ncmpwn::error::{DumpResult, Error as DumpError};
 use ncmpwn::MediaFormat;
+use ncmpwn::NcmInfo;
 use uuid::Uuid;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
-use ncmpwn::NcmInfo;
 
 use material_yew::top_app_bar_fixed::MatTopAppBarTitle;
 use material_yew::MatCircularProgress;
 use material_yew::MatTopAppBarFixed;
 
-use crate::dump_api::{self, media_mime_to_ext, data_to_object_url};
+use crate::dump_api::{self, data_to_object_url, media_mime_to_ext};
 
 // const WIDTH: u32 = 128;
 // const HEIGHT: u32 = 128;
@@ -49,7 +49,7 @@ impl DecryptedFile {
         name: &str,
         image: Option<(ImageFormat, String)>,
         data: &[u8],
-        info: Option<NcmInfo>
+        info: Option<NcmInfo>,
     ) -> Self {
         // let base64_data = STANDARD.encode(data);
         let object_url = data_to_object_url(data);
