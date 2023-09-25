@@ -3,6 +3,7 @@ pub use ncmpwn::ncmdump::MediaFormat;
 use ncmpwn::{ncmdump::{NcmInfo, NcmDump}, qmcdump::QmcDump};
 pub use ncmpwn::ncmdump::{ error::DumpResult, error::Error as DumpError };
 use image::ImageFormat;
+use gloo_file::{Blob, ObjectUrl};
 
 pub fn guess_from_qmc_ext(path: &Path) -> MediaFormat {
     match path.extension() {
@@ -79,10 +80,17 @@ pub fn img_to_element(format: ImageFormat, data: &str) -> String {
     }
 }
 
+#[allow(unused)]
+#[deprecated]
 pub fn data_to_element(format: MediaFormat, data: &str) -> String {
     match format {
         MediaFormat::fLaC => format!("data:audio/flac;base64,{}", data),
         MediaFormat::ID3v2 => format!("data:audio/mp3;base64,{}", data),
         _ => "".to_owned(),
     }
+}
+
+pub fn data_to_object_url(data: &[u8]) -> ObjectUrl {
+    let object = Blob::new(data);
+    ObjectUrl::from(object)
 }
